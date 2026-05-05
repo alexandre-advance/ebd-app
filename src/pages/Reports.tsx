@@ -430,6 +430,7 @@ export default function Reports() {
                             </tr>
                           );
                         })
+                      }
                         {selectedCongregation !== 'all' && (
                           <tr className="bg-white/10 font-bold">
                             <td className="p-4">TOTAL</td>
