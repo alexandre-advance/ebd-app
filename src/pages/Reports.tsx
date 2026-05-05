@@ -394,64 +394,10 @@ export default function Reports() {
                       )}
                     </thead>
                     <tbody>
-                      {selectedCongregation === 'all'
-                        ? congregationSummary.map((c, i) => (
-                            <tr key={i} className="hover:bg-white/5">
-                              <td className="p-4 font-bold">{c.name}</td>
-                              <td className="p-4 text-center">{c.totalAttendance}</td>
-                              <td className="p-4 text-center">{c.frequency}%</td>
-                              <td className="p-4 text-center">{c.totalVisitors}</td>
-                              <td className="p-4 text-right text-emerald-400">
-                                R$ {c.totalOfferings.toFixed(2)}
-                              </td>
-                            </tr>
-                          ))
-                        : lessons.map((lesson: any) => {
-                            const totalStudents = lesson.rooms.students?.[0]?.count || 0;
-                            const absent = totalStudents - lesson.attendance_count;
-
-                            return (
-                              <tr key={lesson.id} className="hover:bg-white/5">
-                                <td className="p-4">{formatDate(lesson.date)}</td>
-                                <td className="p-4 font-bold">{lesson.rooms.name}</td>
-                                <td className="p-4">{lesson.title}</td>
-
-                                <td className="p-4 text-center">{totalStudents}</td>
-                                <td className="p-4 text-center">{lesson.attendance_count}</td>
-                                <td className="p-4 text-center">{absent}</td>
-
-                                <td className="p-4 text-center">{lesson.visitors_count}</td>
-                                <td className="p-4 text-center">{lesson.bibles_count}</td>
-                                <td className="p-4 text-center">{lesson.magazines_count}</td>
-
-                                <td className="p-4 text-right text-emerald-400">
-                                  R$ {lesson.offerings_amount.toFixed(2)}
-                                </td>
-                              </tr>
-                            );
-                          })
-                      }
-
-                      {selectedCongregation !== 'all' && (
-                        <tr className="bg-white/10 font-bold">
-                          <td className="p-4">TOTAL</td>
-                          <td></td>
-                          <td></td>
-
-                          <td className="p-4 text-center">{totals.students}</td>
-                          <td className="p-4 text-center">{totals.attendance}</td>
-                          <td className="p-4 text-center">{totals.absent}</td>
-
-                          <td className="p-4 text-center">{totals.visitors}</td>
-                          <td className="p-4 text-center">{totals.bibles}</td>
-                          <td className="p-4 text-center">{totals.magazines}</td>
-
-                          <td className="p-4 text-right text-emerald-400">
-                            R$ {totals.offerings.toFixed(2)}
-                          </td>
-                        </tr>
-                      )}
-                      </tbody>
+                      <tr>
+                        <td>Teste</td>
+                      </tr>
+                    </tbody>
                   </table>
                 </div>
               </motion.div>
