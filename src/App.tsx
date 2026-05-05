@@ -1,3 +1,9 @@
+import React from "react";
+
 export default function App() {
-  return <div>OK</div>;
+  return (
+    <div style={{ color: "white", padding: 20 }}>
+      APP BASE OK
+    </div>
+  );
 }
