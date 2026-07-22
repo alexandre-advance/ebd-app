@@ -118,10 +118,70 @@ export default function Rooms() {
 
     setLoading(true);
     try {
+      // Map display categories to granular fields
+      let dbCategory = '';
+      let subcategory = '';
+      let minAge = 0;
+      let maxAge = 99;
+      let maritalStatus: 'Solteiro' | 'Casado' | null = null;
+
+      switch (category) {
+        case 'INFANTIL (0-5 anos)':
+          dbCategory = 'INFANTIL';
+          subcategory = '0-5';
+          minAge = 0;
+          maxAge = 5;
+          break;
+        case 'INFANTIL (6-8 anos)':
+          dbCategory = 'INFANTIL';
+          subcategory = '6-8';
+          minAge = 6;
+          maxAge = 8;
+          break;
+        case 'INFANTIL (9-11 anos)':
+          dbCategory = 'INFANTIL';
+          subcategory = '9-11';
+          minAge = 9;
+          maxAge = 11;
+          break;
+        case 'ADOLESCENTE (12-14 anos)':
+          dbCategory = 'ADOLESCENTE';
+          subcategory = '12-14';
+          minAge = 12;
+          maxAge = 14;
+          break;
+        case 'ADOLESCENTE (15-17 anos)':
+          dbCategory = 'ADOLESCENTE';
+          subcategory = '15-17';
+          minAge = 15;
+          maxAge = 17;
+          break;
+        case 'JOVENS':
+          dbCategory = 'JOVENS';
+          subcategory = '18-99';
+          minAge = 18;
+          maxAge = 99;
+          maritalStatus = 'Solteiro';
+          break;
+        case 'ADULTOS':
+          dbCategory = 'ADULTOS';
+          subcategory = '18-99';
+          minAge = 18;
+          maxAge = 99;
+          maritalStatus = 'Casado';
+          break;
+        default:
+          dbCategory = category;
+      }
+
       const roomPayload = { 
         name, 
         description, 
-        category,
+        category: dbCategory,
+        subcategory,
+        min_age: minAge,
+        max_age: maxAge,
+        marital_status: maritalStatus,
         congregation_id: congregationId 
       };
 

@@ -6,3 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Supabase
+supabase/.temp/
+
+# Ambiente local
+.env
+
+# Build
+dist/

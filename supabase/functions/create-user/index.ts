@@ -50,8 +50,7 @@ serve(async (req) => {
         .from('profiles')
         .upsert({
           id: authData.user.id,
-          name: full_name,
-          email,
+          full_name,
           role,
           church_id: church_id || null,
           congregation_id: congregation_id || null,

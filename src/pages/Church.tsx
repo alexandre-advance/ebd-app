@@ -18,7 +18,7 @@ import {
   User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '@/src/lib/supabase';
 import type { Congregation, Church as ChurchType } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';

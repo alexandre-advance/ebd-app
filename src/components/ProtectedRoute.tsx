@@ -11,7 +11,7 @@ export function ProtectedRoute() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bordo-800"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-800"></div>
       </div>
     );
   }
@@ -43,7 +43,7 @@ export function ProtectedRoute() {
             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="text-red-600 w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-bordo-800 mb-2">Acesso Bloqueado</h2>
+            <h2 className="text-2xl font-bold text-brand-800 mb-2">Acesso Bloqueado</h2>
             <p className="text-black mb-8">
               Assinatura inativa ou expirada. Entre em contato com o administrador da sua igreja ou com o suporte da ikhaex.
             </p>

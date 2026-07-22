@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { formatDate, parseLocalDate } from '@/src/lib/utils';
 import type { Student, Room } from '../types';
 import { Button } from '../components/ui/Button';

@@ -72,57 +72,76 @@ export default function Dashboard() {
   const [weeklyBirthdays, setWeeklyBirthdays] = useState<BirthdayStudent[]>([]);
   const [activeRanking, setActiveRanking] = useState<'rooms' | 'cong_students' | 'cong_attendance' | 'infanto' | 'jovens' | 'adultos'>('rooms');
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedCongregationFilter, setSelectedCongregationFilter] = useState<string>('all');
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [cachedData, setCachedData] = useState<{
+    congregations: Congregation[];
+    rooms: Room[];
+    students: Student[];
+    lessons: Lesson[];
+  } | null>(null);
 
   useEffect(() => {
     if (church && profile) {
       fetchDashboardData();
     }
-  }, [church, profile]);
+  }, [church, profile, selectedDate]);
 
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      let congregationsQuery = supabase.from('congregations').select('*');
-      let roomsQuery = supabase.from('rooms').select('*, congregations!inner(*)');
-      let studentsQuery = supabase.from('students').select('*, rooms!inner(congregations!inner(*))');
-      let lessonsQuery = supabase.from('lessons').select('*, rooms!inner(congregations!inner(*))');
+      let congregations, rooms, students, lessons;
 
-      // Filter by scope
-      if (profile?.role === 'ADMIN_MASTER') {
-        congregationsQuery = supabase.from('congregations').select('*');
-        roomsQuery = supabase.from('rooms').select('*, congregations!inner(*)');
-        studentsQuery = supabase.from('students').select('*, rooms!inner(congregations!inner(*))');
-        lessonsQuery = supabase.from('lessons').select('*, rooms!inner(congregations!inner(*))');
-      } else if (profile?.role === 'ADMIN_APP') {
-        congregationsQuery = congregationsQuery.eq('church_id', church!.id);
-        roomsQuery = roomsQuery.eq('congregations.church_id', church!.id);
-        studentsQuery = studentsQuery.eq('rooms.congregations.church_id', church!.id);
-        lessonsQuery = lessonsQuery.eq('rooms.congregations.church_id', church!.id);
-      } else if (profile?.role === 'SECRETARIO') {
-        congregationsQuery = congregationsQuery.eq('church_id', church!.id);
-        roomsQuery = roomsQuery.eq('congregations.church_id', church!.id);
-        studentsQuery = studentsQuery.eq('rooms.congregations.church_id', church!.id);
-        lessonsQuery = lessonsQuery.eq('rooms.congregations.church_id', church!.id);
-        
-        if (profile.congregation_id) {
-          congregationsQuery = congregationsQuery.eq('id', profile.congregation_id);
-          roomsQuery = roomsQuery.eq('congregation_id', profile.congregation_id);
-          studentsQuery = studentsQuery.eq('rooms.congregation_id', profile.congregation_id);
-          lessonsQuery = lessonsQuery.eq('rooms.congregation_id', profile.congregation_id);
+      if (cachedData) {
+        congregations = cachedData.congregations;
+        rooms = cachedData.rooms;
+        students = cachedData.students;
+        lessons = cachedData.lessons;
+      } else {
+        let congregationsQuery = supabase.from('congregations').select('*');
+        let roomsQuery = supabase.from('rooms').select('*, congregations!inner(*)');
+        let studentsQuery = supabase.from('students').select('*, rooms!inner(congregations!inner(*))');
+        let lessonsQuery = supabase.from('lessons').select('*, rooms!inner(congregations!inner(*))');
+
+        // Filter by scope
+        if (profile?.role === 'ADMIN_MASTER') {
+          congregationsQuery = supabase.from('congregations').select('*');
+          roomsQuery = supabase.from('rooms').select('*, congregations!inner(*)');
+          studentsQuery = supabase.from('students').select('*, rooms!inner(congregations!inner(*))');
+          lessonsQuery = supabase.from('lessons').select('*, rooms!inner(congregations!inner(*))');
+        } else if (profile?.role === 'ADMIN_APP') {
+          congregationsQuery = congregationsQuery.eq('church_id', church!.id);
+          roomsQuery = roomsQuery.eq('congregations.church_id', church!.id);
+          studentsQuery = studentsQuery.eq('rooms.congregations.church_id', church!.id);
+          lessonsQuery = lessonsQuery.eq('rooms.congregations.church_id', church!.id);
+        } else if (profile?.role === 'SECRETARIO') {
+          congregationsQuery = congregationsQuery.eq('church_id', church!.id);
+          roomsQuery = roomsQuery.eq('congregations.church_id', church!.id);
+          studentsQuery = studentsQuery.eq('rooms.congregations.church_id', church!.id);
+          lessonsQuery = lessonsQuery.eq('rooms.congregations.church_id', church!.id);
+          
+          if (profile.congregation_id) {
+            congregationsQuery = congregationsQuery.eq('id', profile.congregation_id);
+            roomsQuery = roomsQuery.eq('congregation_id', profile.congregation_id);
+            studentsQuery = studentsQuery.eq('rooms.congregation_id', profile.congregation_id);
+            lessonsQuery = lessonsQuery.eq('rooms.congregation_id', profile.congregation_id);
+          }
         }
+
+        const [congRes, roomsRes, studentsRes, lessonsRes] = await Promise.all([
+          congregationsQuery,
+          roomsQuery,
+          studentsQuery,
+          lessonsQuery
+        ]);
+
+        congregations = congRes.data || [];
+        rooms = roomsRes.data || [];
+        students = studentsRes.data || [];
+        lessons = lessonsRes.data || [];
+        setCachedData({ congregations, rooms, students, lessons });
       }
-
-      const [congRes, roomsRes, studentsRes, lessonsRes] = await Promise.all([
-        congregationsQuery,
-        roomsQuery,
-        studentsQuery,
-        lessonsQuery
-      ]);
-
-      const congregations = congRes.data || [];
-      const rooms = roomsRes.data || [];
-      const students = studentsRes.data || [];
-      const lessons = lessonsRes.data || [];
 
       const totalOfferings = lessons.reduce((acc, curr) => acc + Number(curr.offerings_amount), 0);
 
@@ -147,20 +166,20 @@ export default function Dashboard() {
         return age;
       };
 
-      // Helper: Categorize Room
+  // Helper: Categorize Room
       const getRoomCategory = (roomId: string) => {
         const room = rooms.find(r => r.id === roomId);
         if (!room) return 'none';
 
-        const category = room.category || '';
+        const category = (room.category || '').toUpperCase();
 
         // Ranking 1 — Infanto-juvenil
-        if (category.includes('INFANTIL')) {
+        if (category === 'INFANTIL') {
           return 'infanto';
         }
 
-        // Ranking 2 — Adolescentes e jovens solteiros
-        if (category.includes('ADOLESCENTE') || category === 'JOVENS') {
+        // Ranking 2 — Adolescente e jovens solteiros
+        if (category === 'ADOLESCENTE' || category === 'JOVENS') {
           return 'jovens';
         }
 
@@ -183,28 +202,32 @@ export default function Dashboard() {
       };
 
       // Helper: Calculate Score for a single lesson
-      const calculateLessonScore = (lesson: Lesson, roomStudentsCount: number, maxOfferingInDay: number) => {
-        if (roomStudentsCount === 0) return { score: 0, metrics: { attendance: 0, visitors: 0, bibles: 0, magazines: 0, offerings: 0 } };
+      // New Formula: % Presença + (Visitantes × 5) + % Bíblias + % Revistas + Valor da Oferta
+      const calculateLessonScore = (lesson: Lesson, roomStudentsCount: number) => {
+        // Frequência = (Presentes ÷ Matriculados) × 100
+        const presencePct = roomStudentsCount > 0 ? (lesson.attendance_count / roomStudentsCount) * 100 : 0;
         
-        const totalPeople = lesson.attendance_count + lesson.visitors_count;
-        const freq = (lesson.attendance_count / roomStudentsCount) * 100;
-        const visit = totalPeople > 0
-          ? Math.min((lesson.visitors_count / totalPeople) * 100, 100)
-          : 0;
-        const biblia = totalPeople > 0 ? (lesson.bibles_count / totalPeople) * 100 : 0;
-        const revista = totalPeople > 0 ? (lesson.magazines_count / totalPeople) * 100 : 0;
-        const oferta = maxOfferingInDay > 0 ? (lesson.offerings_amount / maxOfferingInDay) * 100 : 0;
+        // Bíblias = (Bíblias ÷ Matriculados) × 100
+        const biblesPct = lesson.attendance_count > 0 ? (lesson.bibles_count / roomStudentsCount) * 100 : 0;
         
-        const score = (freq + visit + biblia + revista + oferta) / 5;
+        // Revistas = (Revistas ÷ Matriculados) × 100
+        const magazinesPct = lesson.attendance_count > 0 ? (lesson.magazines_count / roomStudentsCount) * 100 : 0;
+        
+        const score = 
+          presencePct + 
+          (lesson.visitors_count * 5) + 
+          biblesPct + 
+          magazinesPct + 
+          lesson.offerings_amount;
         
         return {
-          score,
+          score: Number(score.toFixed(2)),
           metrics: {
-            attendance: freq,
-            visitors: visit,
-            bibles: biblia,
-            magazines: revista,
-            offerings: oferta
+            attendance: presencePct,
+            visitors: lesson.visitors_count,
+            bibles: biblesPct,
+            magazines: magazinesPct,
+            offerings: lesson.offerings_amount
           }
         };
       };
@@ -222,19 +245,25 @@ export default function Dashboard() {
         maxOfferingByDate[date] = Math.max(...dateLessons.map(l => l.offerings_amount));
       });
 
-      // 🔹 Descobrir a data mais recente registrada (último domingo)
-      const lastLessonDate = lessons
-        .map(l => l.date)
-        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+      // 🔹 Obter datas disponíveis (conforme regra solicitada)
+      const dates = [
+        ...new Set(lessons.map(lesson => lesson.date))
+      ].sort((a, b) => (b as string).localeCompare(a as string)) as string[];
+      setAvailableDates(dates);
+      
+      const targetDate = selectedDate || dates[0];
+      if (!selectedDate && dates[0]) {
+        setSelectedDate(dates[0]);
+      }
 
-      // 🔹 Filtrar apenas as lições desse domingo
-      const lessonsLastSunday = lessons.filter(
-        l => l.date?.slice(0,10) === lastLessonDate?.slice(0,10)
+      // 🔹 Filtrar apenas as lições da data selecionada
+      const lessonsOnSelectedDate = lessons.filter(
+        l => l.date === targetDate
       );
 
-      // Calculate Daily Rankings (based on latest lesson for each room)
+      // Calculate Daily Rankings
       const latestLessons: Record<string, Lesson> = {};
-      lessonsLastSunday.forEach(l => {
+      lessonsOnSelectedDate.forEach(l => {
         if (!latestLessons[l.room_id] || new Date(l.date) > new Date(latestLessons[l.room_id].date)) {
           latestLessons[l.room_id] = l;
         }
@@ -243,10 +272,15 @@ export default function Dashboard() {
       const roomDailyScores: Record<string, RankingItem> = {};
       rooms.forEach(r => {
         const lesson = latestLessons[r.id];
-        const roomStudents = students.filter(s => s.room_id === r.id);
+        const roomStudentsCount = students.filter(
+          student => student.room_id === r.id
+        ).length;
+        
         if (lesson) {
-          const date = lesson.date.split('T')[0];
-          const result = calculateLessonScore(lesson, roomStudents.length, maxOfferingByDate[date]);
+          const result = calculateLessonScore(
+            lesson,
+            roomStudentsCount
+          );
           roomDailyScores[r.id] = {
             id: r.id,
             name: r.name,
@@ -261,14 +295,20 @@ export default function Dashboard() {
       const roomAnnualScores: Record<string, RankingItem> = {};
       rooms.forEach(r => {
         const roomLessons = lessons.filter(l => l.room_id === r.id);
-        const roomStudents = students.filter(s => s.room_id === r.id);
+        const roomStudentsCount = students.filter(
+          student => student.room_id === r.id
+        ).length;
         
         if (roomLessons.length > 0) {
+          let totalScore = 0;
           let totalFreq = 0, totalVisit = 0, totalBiblia = 0, totalRevista = 0, totalOferta = 0;
           
           roomLessons.forEach(l => {
-            const date = l.date.split('T')[0];
-            const res = calculateLessonScore(l, roomStudents.length, maxOfferingByDate[date]);
+            const res = calculateLessonScore(
+              l,
+              roomStudentsCount
+            );
+            totalScore += res.score;
             totalFreq += res.metrics.attendance;
             totalVisit += res.metrics.visitors;
             totalBiblia += res.metrics.bibles;
@@ -276,24 +316,24 @@ export default function Dashboard() {
             totalOferta += res.metrics.offerings;
           });
 
-          const avgFreq = totalFreq / roomLessons.length;
-          const avgVisit = totalVisit / roomLessons.length;
-          const avgBiblia = totalBiblia / roomLessons.length;
-          const avgRevista = totalRevista / roomLessons.length;
-          const avgOferta = totalOferta / roomLessons.length;
+          const count = roomLessons.length;
+          const avgFreq = totalFreq / count;
+          const avgBiblia = totalBiblia / count;
+          const avgRevista = totalRevista / count;
           
-          const score = (avgFreq + avgVisit + avgBiblia + avgRevista + avgOferta) / 5;
-
+          // Formula: avgFreq + (totalVisit * 5) + avgBiblia + avgRevista + totalOferta
+          const annualScore = avgFreq + (totalVisit * 5) + avgBiblia + avgRevista + totalOferta;
+          
           roomAnnualScores[r.id] = {
             id: r.id,
             name: r.name,
-            score,
+            score: Number(annualScore.toFixed(2)),
             metrics: {
               attendance: avgFreq,
-              visitors: avgVisit,
+              visitors: totalVisit,
               bibles: avgBiblia,
               magazines: avgRevista,
-              offerings: avgOferta
+              offerings: totalOferta
             },
             rank: 'none'
           };
@@ -325,88 +365,71 @@ export default function Dashboard() {
       setRankingJovensAnnual(sortAndRank(annualJovens));
       setRankingAdultosAnnual(sortAndRank(annualAdultos));
 
-      // Original Room Ranking (keep for compatibility or other roles)
-      const roomScores: Record<string, { name: string, score: number }> = {};
-      rooms.forEach(r => {
-        roomScores[r.id] = { name: r.name, score: 0 };
-      });
-
-      lessons.forEach(l => {
-        if (roomScores[l.room_id]) {
-          const score = l.attendance_count + l.visitors_count + l.bibles_count + l.magazines_count + (l.offerings_amount / 10);
-          roomScores[l.room_id].score += score;
-        }
-      });
-
-      const sortedRanking: RankingItem[] = Object.entries(roomScores)
-        .map(([id, data]) => ({
-          id,
-          name: data.name,
-          score: Math.round(data.score),
-          rank: 'none' as const
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5);
-
-      if (sortedRanking[0]) sortedRanking[0].rank = 'gold';
-      if (sortedRanking[1]) sortedRanking[1].rank = 'silver';
-      if (sortedRanking[2]) sortedRanking[2].rank = 'bronze';
-
-      setRanking(sortedRanking);
+      // Overall Ranking (All rooms sorted by score)
+      const allDaily = [...dailyInfanto, ...dailyJovens, ...dailyAdultos];
+      setRanking(sortAndRank(allDaily));
 
       // Calculate Congregation Rankings
       const congStats: Record<string, { 
         name: string, 
         studentCount: number, 
-        totalAttendance: number, 
-        expectedAttendance: number 
+        totalAttendance: number
       }> = {};
 
       congregations.forEach(c => {
-        congStats[c.id] = { name: c.name, studentCount: 0, totalAttendance: 0, expectedAttendance: 0 };
+        congStats[c.id] = { name: c.name, studentCount: 0, totalAttendance: 0 };
       });
 
+      // Total matriculados por congregação
       students.forEach(s => {
-        const roomId = s.room_id;
-        const room = rooms.find(r => r.id === roomId);
+        const room = rooms.find(r => r.id === s.room_id);
         if (room && congStats[room.congregation_id]) {
           congStats[room.congregation_id].studentCount++;
         }
       });
 
-      lessons.forEach(l => {
-        const roomId = l.room_id;
-        const room = rooms.find(r => r.id === roomId);
+      // Total de presentes na data selecionada
+      lessonsOnSelectedDate.forEach(l => {
+        const room = rooms.find(r => r.id === l.room_id);
         if (room && congStats[room.congregation_id]) {
           congStats[room.congregation_id].totalAttendance += l.attendance_count;
-          const roomStudents = students.filter(s => s.room_id === roomId).length;
-          congStats[room.congregation_id].expectedAttendance += roomStudents;
         }
       });
 
-      const congRankingData: CongregationRankingItem[] = Object.entries(congStats).map(([id, data]) => ({
-        id,
-        name: data.name,
-        studentCount: data.studentCount,
-        attendanceRate: data.expectedAttendance > 0 ? (data.totalAttendance / data.expectedAttendance) * 100 : 0,
-        rank: 'none' as const
-      }));
+      const congRankingData: CongregationRankingItem[] = congregations.map(c => {
+        const stats = congStats[c.id];
+        return {
+          id: c.id,
+          name: stats.name,
+          studentCount: stats.studentCount,
+          attendanceRate: stats.studentCount > 0 ? (stats.totalAttendance / stats.studentCount) * 100 : 0,
+          rank: 'none' as const
+        };
+      });
 
       const sortedByStudents = [...congRankingData]
-        .sort((a, b) => b.studentCount - a.studentCount)
-        .slice(0, 5);
+        .sort((a, b) => b.studentCount - a.studentCount);
       if (sortedByStudents[0]) sortedByStudents[0].rank = 'gold';
       if (sortedByStudents[1]) sortedByStudents[1].rank = 'silver';
       if (sortedByStudents[2]) sortedByStudents[2].rank = 'bronze';
-      setCongRankingStudents(sortedByStudents);
+      
+      setCongRankingStudents(
+        profile?.role === 'ADMIN_MASTER' || profile?.role === 'ADMIN_APP'
+          ? sortedByStudents
+          : []
+      );
 
       const sortedByAttendance = [...congRankingData]
-        .sort((a, b) => b.attendanceRate - a.attendanceRate)
-        .slice(0, 5);
+        .sort((a, b) => b.attendanceRate - a.attendanceRate);
       if (sortedByAttendance[0]) sortedByAttendance[0].rank = 'gold';
       if (sortedByAttendance[1]) sortedByAttendance[1].rank = 'silver';
       if (sortedByAttendance[2]) sortedByAttendance[2].rank = 'bronze';
-      setCongRankingAttendance(sortedByAttendance);
+      
+      setCongRankingAttendance(
+        profile?.role === 'ADMIN_MASTER' || profile?.role === 'ADMIN_APP'
+          ? sortedByAttendance
+          : []
+      );
 
       // Calculate Weekly Birthdays
       const today = new Date();
@@ -457,12 +480,10 @@ export default function Dashboard() {
 
   const hasNoChurch = !church && profile?.role !== 'ADMIN_MASTER' && profile?.role !== 'ADMIN_APP';
 
-  const rankingDate = stats.totalLessons > 0
-  ? new Date().toLocaleDateString('pt-BR')
-  : '';
+  const rankingDate = selectedDate ? formatDate(selectedDate) : '';
 
   return (
-    <div className="w-full px-6 1g:px-10 py-8 space-y-8">
+    <div className="w-full px-6 lg:px-10 py-8 space-y-8">
       {hasNoChurch ? (
         <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center bg-brand-800 rounded-2xl sm:rounded-3xl shadow-lg px-4 p-6 sm:p-10 text-white">
           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/10 rounded-full flex items-center justify-center mb-6">
@@ -531,13 +552,52 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-3 bg-brand-800 text-white rounded-2xl p-6 sm:p-8 shadow-lg space-y-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/10 rounded-xl">
-                    <Trophy className="text-white" size={24} />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/10 rounded-xl">
+                      <Trophy className="text-white" size={24} />
+                    </div>
+                    <h2 className="text-lg sm:text-xl font-bold text-white">
+                      RANKING {rankingPeriod === 'annual' && 'ANUAL'}
+                    </h2>
                   </div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white">
-                    RANKING {rankingDate && `— ${rankingDate}`}
-                  </h2>
+                  
+                  {rankingPeriod === 'daily' && availableDates.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Data:</span>
+                        <select 
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="bg-white/5 border border-white/10 text-white text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none cursor-pointer"
+                        >
+                          {availableDates.map(date => (
+                            <option key={date} value={date} className="bg-brand-800 text-white">
+                              {formatDate(date)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {profile?.role === 'ADMIN_MASTER' && (activeRanking === 'cong_students' || activeRanking === 'cong_attendance') && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Congregação:</span>
+                          <select 
+                            value={selectedCongregationFilter}
+                            onChange={(e) => setSelectedCongregationFilter(e.target.value)}
+                            className="bg-white/5 border border-white/10 text-white text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none cursor-pointer"
+                          >
+                            <option value="all" className="bg-brand-800 text-white italic">Todas as Congregações</option>
+                            {cachedData?.congregations.map(c => (
+                              <option key={c.id} value={c.id} className="bg-brand-800 text-white">
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
@@ -547,36 +607,32 @@ export default function Dashboard() {
                       ${activeRanking === 'rooms' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
                     `}
                   >
-                    Turmas
+                    Geral
                   </button>
-                  {profile?.role === 'SECRETARIO' && (
-                    <>
-                      <button 
-                        onClick={() => setActiveRanking('infanto')}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0
-                          ${activeRanking === 'infanto' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                      >
-                        Infanto-juvenil
-                      </button>
-                      <button 
-                        onClick={() => setActiveRanking('jovens')}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0
-                          ${activeRanking === 'jovens' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                      >
-                        Jovens
-                      </button>
-                      <button 
-                        onClick={() => setActiveRanking('adultos')}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0
-                          ${activeRanking === 'adultos' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                      >
-                        Adultos
-                      </button>
-                    </>
-                  )}
+                  <button 
+                    onClick={() => setActiveRanking('infanto')}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0
+                      ${activeRanking === 'infanto' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
+                    `}
+                  >
+                    Infanto-juvenil
+                  </button>
+                  <button 
+                    onClick={() => setActiveRanking('jovens')}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0
+                      ${activeRanking === 'jovens' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
+                    `}
+                  >
+                    Jovens
+                  </button>
+                  <button 
+                    onClick={() => setActiveRanking('adultos')}
+                    className={`px-4 py-1.5 rounded-lg sm:px-4 sm:py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0
+                      ${activeRanking === 'adultos' ? 'bg-white text-brand-700 shadow-lg' : 'bg-white/5 text-white/60 hover:bg-white/10'}
+                    `}
+                  >
+                    Adultos
+                  </button>
                   {(profile?.role === 'ADMIN_APP' || profile?.role === 'ADMIN_MASTER') && (
                     <>
                       <button 
@@ -649,13 +705,15 @@ export default function Dashboard() {
                 ))}
 
                 {(activeRanking === 'cong_students' || activeRanking === 'cong_attendance') && 
-                  (activeRanking === 'cong_students' ? congRankingStudents : congRankingAttendance).map((item, index) => (
+                  (activeRanking === 'cong_students' ? congRankingStudents : congRankingAttendance)
+                    .filter(item => selectedCongregationFilter === 'all' || item.id === selectedCongregationFilter)
+                    .map((item, index) => (
                     <div key={item.id} className="flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-white/5 border-2 border-white hover:bg-white/10 transition-all">
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base shrink-0
-                          ${item.rank === 'gold' ? 'bg-yellow-400 text-bordo-900' : 
-                            item.rank === 'silver' ? 'bg-slate-300 text-bordo-900' : 
-                            item.rank === 'bronze' ? 'bg-orange-400 text-bordo-900' : 
+                          ${item.rank === 'gold' ? 'bg-yellow-400 text-brand-900' : 
+                            item.rank === 'silver' ? 'bg-slate-300 text-brand-900' : 
+                            item.rank === 'bronze' ? 'bg-orange-400 text-brand-900' : 
                             'bg-white/10 text-white'}
                         `}>
                           {item.rank === 'gold' ? <Medal size={18} className="sm:w-5 sm:h-5" /> : 
@@ -721,23 +779,37 @@ export default function Dashboard() {
                       <div className="grid grid-cols-5 gap-2 pt-2 border-t border-white/5">
                         <div className="text-center">
                           <p className="text-[10px] font-bold text-white/40 uppercase">Freq</p>
-                          <p className="text-xs font-bold text-white">{item.metrics?.attendance.toFixed(0)}%</p>
+                          <p className="text-xs font-bold text-white">
+                            {item.metrics?.attendance.toFixed(2)}%
+                          </p>
                         </div>
+
                         <div className="text-center">
                           <p className="text-[10px] font-bold text-white/40 uppercase">Visitas</p>
-                          <p className="text-xs font-bold text-white">{item.metrics?.visitors.toFixed(0)}%</p>
+                          <p className="text-xs font-bold text-white">
+                            {item.metrics?.visitors ?? 0}
+                          </p>
                         </div>
+
                         <div className="text-center">
                           <p className="text-[10px] font-bold text-white/40 uppercase">Bíblias</p>
-                          <p className="text-xs font-bold text-white">{item.metrics?.bibles.toFixed(0)}%</p>
+                          <p className="text-xs font-bold text-white">
+                            {(item.metrics?.bibles ?? 0).toFixed(2)}%
+                          </p>
                         </div>
+
                         <div className="text-center">
                           <p className="text-[10px] font-bold text-white/40 uppercase">Revistas</p>
-                          <p className="text-xs font-bold text-white">{item.metrics?.magazines.toFixed(0)}%</p>
+                          <p className="text-xs font-bold text-white">
+                            {(item.metrics?.magazines ?? 0).toFixed(2)}%
+                          </p>
                         </div>
+
                         <div className="text-center">
                           <p className="text-[10px] font-bold text-white/40 uppercase">Ofertas</p>
-                          <p className="text-xs font-bold text-white">{item.metrics?.offerings.toFixed(0)}%</p>
+                          <p className="text-xs font-bold text-white">
+                            R$ {(item.metrics?.offerings ?? 0).toFixed(2)}
+                          </p>
                         </div>
                       </div>
                     </div>

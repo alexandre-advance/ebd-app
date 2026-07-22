@@ -26,8 +26,53 @@ CREATE TABLE IF NOT EXISTS rooms (
   congregation_id UUID NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
+  category TEXT NOT NULL CHECK (category IN ('INFANTIL', 'ADOLESCENTE', 'JOVENS', 'ADULTOS')),
+  subcategory TEXT, -- ex: 0-5, 6-8, 12-14, 18-99
+  min_age INTEGER NOT NULL DEFAULT 0,
+  max_age INTEGER NOT NULL DEFAULT 99,
+  marital_status TEXT CHECK (marital_status IN ('solteiro', 'casado', 'qualquer')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Function to validate student age and marital status against room settings
+CREATE OR REPLACE FUNCTION validate_student_enrollment()
+RETURNS TRIGGER AS $$
+DECLARE
+  room_category TEXT;
+  room_min_age INTEGER;
+  room_max_age INTEGER;
+  room_marital_status TEXT;
+  student_age INTEGER;
+BEGIN
+  -- Get room details
+  SELECT category, min_age, max_age, marital_status 
+  INTO room_category, room_min_age, room_max_age, room_marital_status
+  FROM rooms 
+  WHERE id = NEW.room_id;
+
+  -- Calculate age (in years)
+  student_age := date_part('year', age(NEW.birth_date));
+
+  -- Validate Age
+  IF student_age < room_min_age OR student_age > room_max_age THEN
+    RAISE EXCEPTION 'A idade do aluno (%) estÃ¡ fora da faixa permitida para esta sala (%-% anos).', student_age, room_min_age, room_max_age;
+  END IF;
+
+  -- Validate Marital Status
+  IF room_marital_status IS NOT NULL AND room_marital_status != 'qualquer' THEN
+    IF LOWER(NEW.marital_status) != room_marital_status THEN
+      RAISE EXCEPTION 'O estado civil do aluno (%) nÃ£o Ã© compatÃvel com esta sala (exige %).', NEW.marital_status, room_marital_status;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to validate before insert or update on students
+CREATE TRIGGER tr_validate_student_enrollment
+BEFORE INSERT OR UPDATE ON students
+FOR EACH ROW EXECUTE FUNCTION validate_student_enrollment();
 
 -- 4. Students (ALUNOS - Apenas registros, sem login)
 CREATE TABLE IF NOT EXISTS students (

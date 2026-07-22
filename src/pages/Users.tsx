@@ -24,7 +24,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { formatDate } from '@/src/lib/utils';
 import { supabase } from '@/src/lib/supabase';
 import type { Profile, Congregation, Church } from '@/src/types';
@@ -88,7 +88,7 @@ export default function Users() {
 
   async function fetchUsers() {
     try {
-      let query = supabase.from('profiles').select('*').order('name');
+      let query = supabase.from('profiles').select('*').order('full_name');
       
       if (church) {
         query = query.eq('church_id', church.id);
@@ -97,6 +97,9 @@ export default function Users() {
       }
 
       const { data, error } = await query;
+
+      console.log('Usuários carregados:', data);
+      console.log('Erro:', error);
 
       if (error) throw error;
       setUsers(data || []);
@@ -142,7 +145,7 @@ export default function Users() {
         const { error } = await supabase
           .from('profiles')
           .update({ 
-            name: userName,
+            full_name: userName,
             role: userRole,
             church_id: userChurchId || null,
             congregation_id: userCongregationId || null
@@ -260,7 +263,7 @@ export default function Users() {
   }
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = u.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchesSearch) return false;
 
     // ADMIN_APP can only see and manage SECRETARIO users of their church
@@ -384,9 +387,9 @@ export default function Users() {
                           <td className="p-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xs">
-                                {u.name?.charAt(0) || 'U'}
+                                {u.full_name?.charAt(0) || 'U'}
                               </div>
-                              <span className="font-semibold text-brand-700 text-sm">{u.name || 'Sem nome'}</span>
+                              <span className="font-semibold text-brand-700 text-sm">{u.full_name || 'Sem nome'}</span>
                             </div>
                           </td>
                           <td className="p-4 text-sm text-gray-600">{u.email || '-'}</td>

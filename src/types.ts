@@ -94,7 +94,11 @@ export interface Database {
           congregation_id: string
           name: string
           description: string | null
-          category: string | null
+          category: string
+          subcategory: string | null
+          min_age: number
+          max_age: number
+          marital_status: 'solteiro' | 'casado' | 'qualquer' | null
           created_at: string
         }
         Insert: {
@@ -102,7 +106,11 @@ export interface Database {
           congregation_id: string
           name: string
           description?: string | null
-          category?: string | null
+          category: string
+          subcategory?: string | null
+          min_age?: number
+          max_age?: number
+          marital_status?: 'solteiro' | 'casado' | 'qualquer' | null
           created_at?: string
         }
         Update: {
@@ -110,7 +118,11 @@ export interface Database {
           congregation_id?: string
           name?: string
           description?: string | null
-          category?: string | null
+          category?: string
+          subcategory?: string | null
+          min_age?: number
+          max_age?: number
+          marital_status?: 'solteiro' | 'casado' | 'qualquer' | null
           created_at?: string
         }
       }

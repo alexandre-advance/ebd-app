@@ -4,7 +4,7 @@ import { supabase } from '@/src/lib/supabase';
 import { formatDate } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/Button';
 import { Landmark, Trash2, Search, Plus, Edit2, X, Save, Loader2, Calendar } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import type { Church } from '@/src/types';
 import ConfirmDeleteModal from '@/src/components/ConfirmDeleteModal';
 

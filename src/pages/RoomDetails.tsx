@@ -249,14 +249,30 @@ export default function RoomDetails() {
 
     if (!error && lessonId) {
       // Save attendance records
+      console.log('=== SAVE ATTENDANCE DEBUG ===');
+      console.log('lessonId:', lessonId);
+      console.log('students.length:', students.length);
+      console.log('attendanceMap:', attendanceMap);
+
       const attendanceData = students.map(student => ({
         lesson_id: lessonId!,
         student_id: student.id,
         present: !!attendanceMap[student.id]
       }));
 
+      console.log('attendanceData:', attendanceData);
+      console.log('attendanceData.length:', attendanceData.length);
+
       // Upsert attendance records
-      const { error: attError } = await supabase.from('attendance').upsert(attendanceData, { onConflict: 'lesson_id,student_id' });
+      const { data, error: attError } = await supabase
+        .from('attendance')
+        .upsert(attendanceData, {
+          onConflict: 'lesson_id,student_id'
+        })
+        .select();
+
+      console.log('UPSERT RESULT:', data);
+      console.log('UPSERT ERROR:', attError);
       
       if (attError) {
         console.error('Error saving attendance:', attError);
