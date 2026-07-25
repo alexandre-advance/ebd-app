@@ -7,6 +7,7 @@ import { Landmark, Trash2, Search, Plus, Edit2, X, Save, Loader2, Calendar } fro
 import { motion, AnimatePresence } from 'motion/react';
 import type { Church } from '@/src/types';
 import ConfirmDeleteModal from '@/src/components/ConfirmDeleteModal';
+import SubscriptionModal from '@/src/components/SubscriptionModal';
 
 export default function Churches() {
   const { profile } = useAuth();
@@ -18,6 +19,9 @@ export default function Churches() {
   const [editingChurch, setEditingChurch] = useState<Church | null>(null);
   const [churchName, setChurchName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const [subscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
+  const [selectedChurchForSubscription, setSelectedChurchForSubscription] = useState<Church | null>(null);
 
   const [deleteConfig, setDeleteConfig] = useState<{
     id: string;
@@ -98,6 +102,80 @@ export default function Churches() {
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  function getSubscriptionBadge(church: Church) {
+    switch (church.subscription_status) {
+      case 'active':
+        return {
+          color: 'bg-green-100 text-green-700',
+          label: '🟢 ATIVA',
+        };
+
+      case 'trial':
+        return {
+          color: 'bg-blue-100 text-blue-700',
+          label: '🔵 TESTE GRATUITO',
+        };
+
+      default:
+        return {
+          color: 'bg-red-100 text-red-700',
+          label: '🔴 BLOQUEADA',
+        };
+    }
+  }
+
+  function getRemainingDays(date: string | null) {
+    if (!date) return null;
+
+    const today = new Date();
+    const expires = new Date(date);
+
+    return Math.max(
+      0,
+      Math.ceil(
+        (expires.getTime() - today.getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    );
+  }
+
+  function getSubscriptionInfo(church: Church) {
+    if (church.subscription_status === 'inactive') {
+      return {
+        color: 'text-red-300',
+        text: 'Assinatura bloqueada',
+      };
+    }
+
+    if (!church.subscription_expires_at) {
+      return {
+        color: 'text-green-300',
+        text: 'Sem data de expiração',
+      };
+    }
+
+    const days = getRemainingDays(church.subscription_expires_at);
+
+    if (days <= 0) {
+      return {
+        color: 'text-red-300',
+        text: 'Assinatura expirada',
+      };
+    }
+
+    if (days <= 7) {
+      return {
+        color: 'text-yellow-300',
+        text: `Expira em ${days} dia${days > 1 ? 's' : ''}`,
+      };
+    }
+
+    return {
+      color: 'text-green-300',
+      text: `Expira em ${days} dias`,
+    };
+  }
+
   if (profile?.role !== 'ADMIN_MASTER') {
     return (
       <div className="p-8 text-center">
@@ -141,13 +219,17 @@ export default function Churches() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {filteredChurches.map((church) => (
-            <motion.div
-              key={church.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-brand-800 text-white rounded-2xl p-5 sm:p-6 shadow-lg group flex flex-col h-full"
-            >
+          {filteredChurches.map((church) => {
+            const badge = getSubscriptionBadge(church);
+            const info = getSubscriptionInfo(church);
+
+            return (
+              <motion.div
+                key={church.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-brand-800 text-white rounded-2xl p-5 sm:p-6 shadow-lg group flex flex-col h-full"
+              >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/10 rounded-xl">
@@ -180,19 +262,73 @@ export default function Churches() {
                 </div>
               </div>
               
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    setSelectedChurchForSubscription(church);
+                    setSubscriptionModalOpen(true);
+                  }}
+                  className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2 text-sm font-medium transition-colors"
+                >
+                  Assinatura
+                </button>
+              </div>
+
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-center gap-2 text-xs text-white opacity-99">
                   <Calendar size={14} />
                   <span>Criada em: {formatDate(church.created_at)}</span>
                 </div>
                 <p className="text-xs sm:text-sm text-white opacity-99 line-clamp-2">
-                  {church.address || 'Sem endereço cadastrado'}
+                  {[
+                    church.street,
+                    church.number,
+                    church.neighborhood,
+                    church.city,
+                    church.state
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'Sem endereço cadastrado'}
                 </p>
+                <div className="mt-3 rounded-xl bg-white/10 p-3">
+
+                  <div
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badge.color}`}
+                  >
+                    {badge.label}
+                  </div>
+
+                  <p className={`mt-2 text-xs font-medium ${info.color}`}>
+                    {info.text}
+                  </p>
+
+                  {church.subscription_status === 'active' &&
+                    church.subscription_expires_at && (
+                      <p className="mt-2 text-xs text-white">
+                        Expira em:
+                        <br />
+                        <strong>{formatDate(church.subscription_expires_at)}</strong>
+                      </p>
+                    )}
+
+                  {church.subscription_status === 'trial' &&
+                    church.subscription_expires_at && (
+                      <p className="mt-2 text-xs text-white">
+                        Restam:
+                        <br />
+                        <strong>
+                          {getRemainingDays(church.subscription_expires_at)} dias
+                        </strong>
+                      </p>
+                    )}
+
+                </div>
               </div>
             </motion.div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+    )}
 
       {!loading && filteredChurches.length === 0 && (
         <div className="text-center py-12 sm:py-20 bg-brand-800 rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-10 text-white">
@@ -282,6 +418,16 @@ export default function Churches() {
         message={deleteConfig?.message || ""}
         onClose={() => setDeleteConfig(null)}
         onDeleted={() => fetchChurches()}
+      />
+
+      <SubscriptionModal
+        open={subscriptionModalOpen}
+        church={selectedChurchForSubscription}
+        onSaved={fetchChurches}
+        onClose={() => {
+          setSubscriptionModalOpen(false);
+          setSelectedChurchForSubscription(null);
+        }}
       />
     </div>
   );

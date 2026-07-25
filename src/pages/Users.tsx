@@ -71,6 +71,7 @@ export default function Users() {
   const hasNoChurch = !church && currentUserProfile?.role !== 'ADMIN_MASTER';
 
   useEffect(() => {
+    fetchChurches();
     fetchUsers();
     if (church) {
       fetchCongregations(church.id);
@@ -88,20 +89,18 @@ export default function Users() {
 
   async function fetchUsers() {
     try {
-      let query = supabase.from('profiles').select('*').order('full_name');
-      
-      if (church) {
-        query = query.eq('church_id', church.id);
-      } else if (currentUserProfile?.role === 'ADMIN_APP' && currentUserProfile.church_id) {
-        query = query.eq('church_id', currentUserProfile.church_id);
-      }
-
-      const { data, error } = await query;
-
-      console.log('Usuários carregados:', data);
-      console.log('Erro:', error);
+      const { data, error } = await supabase.rpc(
+        'get_users_admin',
+        {
+          p_church_id:
+            currentUserProfile?.role === 'ADMIN_MASTER'
+              ? null
+              : currentUserProfile?.church_id
+        }
+      );
 
       if (error) throw error;
+
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
