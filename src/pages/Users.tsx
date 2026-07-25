@@ -21,7 +21,10 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Calendar
+  Calendar,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,6 +52,28 @@ export default function Users() {
   const [userPassword, setUserPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [sortField, setSortField] = useState<string>('full_name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  function handleSort(field: string) {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }
+
+  function renderSortIcon(field: string) {
+    if (sortField !== field) {
+      return <ArrowUpDown size={14} className="inline ml-1 opacity-60" />;
+    }
+
+    return sortDirection === 'asc'
+      ? <ArrowUp size={14} className="inline ml-1" />
+      : <ArrowDown size={14} className="inline ml-1" />;
+  }
 
   const fetchChurches = async () => {
     const { data, error } = await supabase
@@ -273,6 +298,41 @@ export default function Users() {
     return true;
   });
 
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
+
+    switch (sortField) {
+      case 'church_name':
+        valueA = churches.find(c => c.id === a.church_id)?.name ?? '';
+        valueB = churches.find(c => c.id === b.church_id)?.name ?? '';
+        break;
+
+      case 'congregation_name':
+        valueA = congregations.find(c => c.id === a.congregation_id)?.name ?? '';
+        valueB = congregations.find(c => c.id === b.congregation_id)?.name ?? '';
+        break;
+
+      default:
+        valueA = (a as any)[sortField] ?? '';
+        valueB = (b as any)[sortField] ?? '';
+        break;
+    }
+
+    if (sortField === 'created_at') {
+      const dateA = new Date(valueA).getTime();
+      const dateB = new Date(valueB).getTime();
+
+      return sortDirection === 'asc'
+        ? dateA - dateB
+        : dateB - dateA;
+    }
+
+    return sortDirection === 'asc'
+      ? String(valueA).localeCompare(String(valueB), 'pt-BR')
+      : String(valueB).localeCompare(String(valueA), 'pt-BR');
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -371,17 +431,47 @@ export default function Users() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-800 text-white">
-                        <th className="p-4 text-xs font-bold uppercase tracking-widest">Nome</th>
-                        <th className="p-4 text-xs font-bold uppercase tracking-widest">Email</th>
-                        <th className="p-4 text-xs font-bold uppercase tracking-widest">Perfil</th>
-                        <th className="p-4 text-xs font-bold uppercase tracking-widest">Igreja</th>
-                        <th className="p-4 text-xs font-bold uppercase tracking-widest">Congregação</th>
-                        <th className="p-4 text-xs font-bold uppercase tracking-widest">Criação</th>
+                        <th
+                          onClick={() => handleSort('full_name')}
+                          className="p-4 text-xs font-bold uppercase tracking-widest cursor-pointer select-none hover:bg-brand-700 transition-colors"
+                        >
+                          Nome {renderSortIcon('full_name')}
+                        </th>
+                        <th
+                          onClick={() => handleSort('email')}
+                          className="p-4 text-xs font-bold uppercase tracking-widest cursor-pointer select-none hover:bg-brand-700 transition-colors"
+                        >
+                          Email {renderSortIcon('email')}
+                        </th>
+                        <th
+                          onClick={() => handleSort('role')}
+                          className="p-4 text-xs font-bold uppercase tracking-widest cursor-pointer select-none hover:bg-brand-700 transition-colors"
+                        >
+                          Perfil {renderSortIcon('role')}
+                        </th>
+                        <th
+                          onClick={() => handleSort('church_name')}
+                          className="p-4 text-xs font-bold uppercase tracking-widest cursor-pointer select-none hover:bg-brand-700 transition-colors"
+                        >
+                          Igreja {renderSortIcon('church_name')}
+                        </th>
+                        <th
+                          onClick={() => handleSort('congregation_name')}
+                          className="p-4 text-xs font-bold uppercase tracking-widest cursor-pointer select-none hover:bg-brand-700 transition-colors"
+                        >
+                          Congregação {renderSortIcon('congregation_name')}
+                        </th>
+                        <th
+                          onClick={() => handleSort('created_at')}
+                          className="p-4 text-xs font-bold uppercase tracking-widest cursor-pointer select-none hover:bg-brand-700 transition-colors"
+                        >
+                          Criação {renderSortIcon('created_at')}
+                        </th>
                         <th className="p-4 text-xs font-bold uppercase tracking-widest text-center">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-200">
-                      {filteredUsers.map((u) => (
+                      {sortedUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-brand-50 transition-colors">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
